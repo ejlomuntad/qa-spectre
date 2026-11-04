@@ -1,0 +1,34 @@
+{
+  "name": "qa-spectre",
+  "owner": {
+    "name": "Ellen Jane Lomuntad"
+  },
+  "description": "Claude Code skills for QA engineering: test design, API audits, and security scanning of agent skills",
+  "version": "1.0.0",
+  "plugins": [
+    {
+      "name": "testkit",
+      "source": "./plugins/testkit",
+      "description": "QA skills for any software project: API test plans and test cases from requirements and specs, and feature-by-feature API audits with bug tickets and pass notes",
+      "category": "testing",
+      "tags": [
+        "qa",
+        "test-design",
+        "api-testing",
+        "test-cases"
+      ]
+    },
+    {
+      "name": "skill-scan",
+      "source": "./plugins/skill-scan",
+      "description": "Read-only security scan of AI agent skills, plugins and MCP configs before you install or share them",
+      "category": "security",
+      "tags": [
+        "security",
+        "skills",
+        "mcp",
+        "supply-chain"
+      ]
+    }
+  ]
+}

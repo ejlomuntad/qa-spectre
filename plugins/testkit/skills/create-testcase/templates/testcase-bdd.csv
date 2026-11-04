@@ -1,0 +1,41 @@
+ID,Title,Type,Priority,Category,Scenario,Tags,Source
+TC-001,Add item to cart,Positive,normal,Cart,"Given a signed-in user has an empty cart
+And the product Desk Lamp costs 25.00
+When the user selects Add to cart on the Desk Lamp page
+Then the cart shows 1 x Desk Lamp
+And the subtotal is 25.00","web, cart",R-01 [checkout-prd.md § Cart]
+TC-002,Quantity 0 rejected,Negative,normal,Cart,"Given the cart has 1 x Desk Lamp
+When the user changes the quantity to 0
+Then the message ""Quantity must be between 1 and 10"" is shown
+And the quantity stays 1","web, cart",R-01 [checkout-prd.md § Cart]
+TC-003,Quantity 11 rejected by API,Edge,normal,Cart,"Given the cart has 1 x Desk Lamp
+When PATCH /v1/cart/items/{id} is sent with quantity 11
+Then the response is 400 with error QUANTITY_OUT_OF_RANGE
+And the quantity stays 1","api, cart",R-01 [checkout-prd.md § Cart]
+TC-004,Valid code reduces total,Positive,critical,Discount Codes,"Given the cart subtotal is 80.00
+And code SAVE10 gives 10% off with a minimum order of 50.00
+When the user applies SAVE10
+Then the discount line shows -8.00
+And the order total is 72.00","web, checkout",R-05 [checkout-prd.md § Discount codes]
+TC-005,Second code rejected,Negative,critical,Discount Codes,"Given the cart subtotal is 80.00 with SAVE10 applied
+When the user applies WELCOME5
+Then the message ""Only one discount code can be used per order"" is shown
+And SAVE10 stays applied
+And the order total stays 72.00","web, checkout",R-05 [checkout-prd.md § Discount codes]
+TC-006,Code at minimum order value,Edge,critical,Discount Codes,"Given the cart subtotal is exactly 50.00
+When the user applies SAVE10
+Then the code is applied
+And the order total is 45.00","web, checkout",R-05 [checkout-prd.md § Discount codes]
+TC-007,Declined card keeps cart,Negative,high,Payment,"Given the user is on the payment step with an order total of 72.00
+When the card is declined
+Then the message ""Your card was declined"" is shown
+And the cart and SAVE10 are kept
+And no order is created","web, payment",R-09 [checkout-prd.md § Payment]
+TC-008,Double submit charges once,Edge,critical,Payment,"Given valid card details are entered on the payment step
+When the user selects Pay twice within one second
+Then one order is created
+And the card is charged once","web, api, payment",R-09 [checkout-prd.md § Payment]
+TC-009,Paid order is locked,Negative,high,Order Confirmation,"Given the order status is PAID
+When PATCH /v1/orders/{id} is sent to change an item quantity
+Then the response is 409 with error ORDER_LOCKED
+And the order is unchanged","api, checkout",S-02 [checkout-prd.md § Order states]

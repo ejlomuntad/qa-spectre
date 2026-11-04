@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Plan: Orders API (example)</title>
+    <style>
+        :root {
+            --green: #1a7f37;
+            --green-bg: #dafbe1;
+            --blue: #0969da;
+            --blue-bg: #ddf4ff;
+            --purple: #8250df;
+            --purple-bg: #fbefff;
+            --red: #cf222e;
+            --red-bg: #ffebe9;
+            --orange: #bf8700;
+            --orange-bg: #fff8c5;
+            --yellow: #9a6700;
+            --yellow-bg: #fff8c5;
+            --border: #d0d7de;
+            --bg-main: #ffffff;
+            --bg-section: #f6f8fa;
+            --bg-body: #f0f2f5;
+            --text: #1f2328;
+            --text-muted: #656d76;
+            --checked-bg: #f0fdf4;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            color: var(--text);
+            line-height: 1.5;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+            background: var(--bg-body);
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+        .header h1 { font-size: 24px; margin-bottom: 8px; }
+        .header .meta { color: var(--text-muted); font-size: 14px; }
+        .header .meta span { margin-right: 16px; }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--orange-bg);
+            color: var(--orange);
+        }
+        .status-badge.approved { background: var(--green-bg); color: var(--green); }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            margin: 16px 0;
+        }
+        .summary-card {
+            background: var(--bg-section);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .summary-card .number { font-size: 28px; font-weight: 700; }
+        .summary-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+        .summary-card.modes .number { color: var(--blue); }
+        .summary-card.tag-smoke .number { color: var(--green); }
+        .summary-card.tag-regression .number { color: var(--purple); }
+        .summary-card.questions .number { color: var(--red); }
+        .summary-card.reviewed .number { color: var(--green); }
+
+        .progress-bar {
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .progress-track {
+            flex: 1;
+            height: 8px;
+            background: var(--bg-section);
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--green);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        .progress-text {
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            min-width: 80px;
+        }
+
+        /* Search */
+        .search-bar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .search-bar input {
+            flex: 1;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+            outline: none;
+        }
+        .search-bar input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(9,105,218,0.15); }
+        .search-bar .search-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+        .shortcut-hint { font-size: 11px; color: var(--text-muted); }
+        kbd { background: var(--bg-section); border: 1px solid var(--border); border-radius: 3px; padding: 1px 4px; font-size: 11px; font-family: inherit; }
+
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .filter-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: var(--bg-main);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+        .filter-btn:hover { border-color: var(--text-muted); }
+        .filter-btn.active { background: var(--text); color: white; border-color: var(--text); }
+
+        /* Sections */
+        .section {
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        .section.collapsed .section-content { display: none; }
+        .section.collapsed .toggle { transform: rotate(-90deg); }
+        .section.search-hidden { display: none; }
+
+        .section-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+        }
+        .section-header:hover { background: var(--bg-section); }
+        .section-header h2 { font-size: 18px; }
+        .section-header .toggle { font-size: 20px; color: var(--text-muted); transition: transform 0.2s; }
+
+        .mode-header { display: flex; align-items: center; gap: 12px; }
+        .mode-badge { font-size: 12px; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
+        .mode-badge.green { background: var(--green-bg); color: var(--green); }
+        .mode-badge.blue { background: var(--blue-bg); color: var(--blue); }
+        .mode-badge.purple { background: var(--purple-bg); color: var(--purple); }
+        .mode-badge.red { background: var(--red-bg); color: var(--red); }
+        .mode-badge.yellow { background: var(--yellow-bg); color: var(--yellow); }
+
+        .section-content { padding: 24px; }
+
+        /* Automated Tests */
+        .automated-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--blue-bg);
+            border-left: 3px solid var(--blue);
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 8px;
+        }
+        .automated-item .tag {
+            display: inline-block;
+            background: var(--blue);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .automated-item .title { font-weight: 600; font-size: 14px; }
+        .automated-item .desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+        /* Feature Map */
+        .flow-diagram {
+            background: #0d1117;
+            color: #e6edf3;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.6;
+        }
+
+        /* Properties dropdown */
+        .props-dropdown { margin-bottom: 16px; }
+        .props-dropdown summary {
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 6px 0;
+            font-weight: 500;
+        }
+        .props-dropdown summary:hover { color: var(--blue); }
+        .props-dropdown .props-list {
+            padding: 14px 20px;
+            background: #0d1117;
+            color: #e6edf3;
+            border-radius: 8px;
+            margin-top: 6px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            list-style: none;
+        }
+        .props-dropdown .props-list li { margin-bottom: 3px; }
+        .props-dropdown .props-list li::before { content: "- "; }
+        .props-note { font-size: 11px; color: #f0883e; font-style: italic; margin-top: 8px; padding-left: 20px; }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0 16px; }
+        th { text-align: left; padding: 8px 12px; background: var(--bg-section); border-bottom: 2px solid var(--border); font-weight: 600; font-size: 12px; text-transform: uppercase; color: var(--text-muted); }
+        td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+        tr:hover td { background: var(--bg-section); }
+        tr.checked td { background: var(--checked-bg); opacity: 0.7; }
+        tr.checked td:not(:first-child) { text-decoration: line-through; text-decoration-color: var(--text-muted); }
+        tr.search-hidden { display: none; }
+
+        .checkbox-cell { width: 36px; text-align: center; }
+        .checkbox-cell input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--green); }
+        .col-scenario { font-weight: 500; }
+        .col-verify { color: var(--text-muted); font-size: 12px; }
+        .col-verify .arrow { color: var(--red); font-style: normal; }
+        .col-verify .info { color: var(--blue); font-style: normal; }
+        .col-source { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+
+        /* Questions */
+        .question-row td:first-child { font-weight: 600; width: 30px; color: var(--purple); }
+
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .summary-grid { grid-template-columns: repeat(3, 1fr); }
+            table { font-size: 12px; }
+            td, th { padding: 6px 8px; }
+            .search-bar { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header" style="text-align:center">
+        <h1>Orders API (example) <span class="status-badge" id="statusBadge">PENDING REVIEW</span></h1>
+        <div class="meta" style="margin-top:4px">
+            <span>API Test Plan | Generated: 2026-11-03</span>
+        </div>
+        <div class="meta" style="margin-top:8px">
+            <span><strong>Sources:</strong> docs/orders-prd.md (v1.2), openapi.yaml</span>
+            <span><strong>Endpoints:</strong> 6</span>
+            <span><strong>Project rules:</strong> none found — generic defaults used</span>
+        </div>
+
+        <div class="summary-grid">
+            <div class="summary-card modes"><div class="number">9</div><div class="label">Areas</div></div>
+            <div class="summary-card tag-smoke"><div class="number">6</div><div class="label">Smoke</div></div>
+            <div class="summary-card tag-regression"><div class="number">30</div><div class="label">Regression</div></div>
+            <div class="summary-card"><div class="number">30</div><div class="label">Total</div></div>
+            <div class="summary-card questions"><div class="number">2</div><div class="label">Questions</div></div>
+            <div class="summary-card reviewed"><div class="number" id="reviewedCount">0</div><div class="label">Reviewed</div></div>
+        </div>
+
+        <div class="progress-bar">
+            <span class="progress-text" id="progressText">0 / 30 reviewed</span>
+            <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search tests, scenarios, verifications, sources..." autocomplete="off">
+        <span class="search-count" id="searchCount"></span>
+        <span class="shortcut-hint"><kbd>/</kbd> to focus</span>
+        <button id="themeToggle" onclick="toggleTheme()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:16px;" title="Toggle light/dark theme">☀️</button>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <!-- Tag pills: one per tag in use (project rules "Test case tags"; default api, smoke, regression). Value = "tag-" + tag. -->
+        <button class="filter-btn" data-filter="tag-smoke">Smoke</button>
+        <button class="filter-btn" data-filter="tag-regression">Regression</button>
+        <button class="filter-btn" data-filter="unchecked">Unchecked Only</button>
+        <button class="filter-btn" data-filter="expand">Expand All</button>
+        <button class="filter-btn" data-filter="collapse">Collapse All</button>
+    </div>
+
+    <!-- Automated Tests -->
+    <div class="section" data-section="automated">
+        <div class="section-header" onclick="toggleSection(this)">
+            <h2>Automated Tests</h2>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <div class="automated-item">
+                <span class="tag">Run First</span>
+                <div><div class="title">Automated: Existing API test suite</div><div class="desc">Run first, before manual testing.</div></div>
+            </div>
+            <div class="automated-item">
+                <span class="tag">Run First</span>
+                <div><div class="title">Automated: Contract tests against openapi.yaml</div><div class="desc">Run at the start and again when the feature is code complete.</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feature Map -->
+    <div class="section" data-section="flow">
+        <div class="section-header" onclick="toggleSection(this)">
+            <h2>Feature Map</h2>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <div class="flow-diagram">├── Endpoints
+│   ├── POST /orders (create)
+│   ├── GET /orders/{id}
+│   ├── GET /orders (list, cursor pagination)
+│   ├── POST /orders/{id}/pay
+│   ├── POST /orders/{id}/cancel
+│   └── POST /orders/{id}/refunds (support role only)
+└── Order states
+    ├── PENDING → PAID → REFUNDED
+    └── PENDING → CANCELLED</div>
+        </div>
+    </div>
+
+    <!-- Test areas: one section per area the docs support; badge = row count -->
+    <div class="section" data-section="happy">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="mode-header">
+                <h2>Happy Paths</h2>
+                <span class="mode-badge green">5</span>
+            </div>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <details class="props-dropdown">
+                <summary>Properties (openapi.yaml)</summary>
+                <ul class="props-list"><li>Order.id</li><li>Order.status</li><li>Order.items</li><li>Order.total</li><li>Order.paidAt</li><li>Refund.amount</li></ul>
+            </details>
+            <table data-mode="happy">
+                <tr><th class="checkbox-cell"></th><th>Test Scenario</th><th>Verification / Note</th><th>Source</th></tr>
+                <tr data-id="1" data-tags="api smoke regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Create order with one valid item</td><td class="col-verify"><span class="arrow">⬅️</span> 201, status=PENDING, total = price x quantity</td><td class="col-source">PRD §2.1; openapi POST /orders</td></tr>
+                <tr data-id="2" data-tags="api smoke regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Get order by id</td><td class="col-verify"><span class="arrow">⬅️</span> 200, body matches the created order</td><td class="col-source">openapi GET /orders/{id}</td></tr>
+                <tr data-id="3" data-tags="api smoke regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Pay a PENDING order</td><td class="col-verify"><span class="arrow">⬅️</span> 200, status=PAID, paidAt set</td><td class="col-source">PRD §2.3</td></tr>
+                <tr data-id="4" data-tags="api smoke regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Cancel a PENDING order</td><td class="col-verify"><span class="arrow">⬅️</span> 200, status=CANCELLED</td><td class="col-source">PRD §2.4</td></tr>
+                <tr data-id="5" data-tags="api smoke regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Full refund of a PAID order</td><td class="col-verify"><span class="arrow">⬅️</span> 201, Refund.amount = Order.total, order status=REFUNDED</td><td class="col-source">PRD §2.5</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="section" data-section="validation">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="mode-header">
+                <h2>Input Validation &amp; Boundaries</h2>
+                <span class="mode-badge blue">5</span>
+            </div>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <details class="props-dropdown">
+                <summary>Properties (openapi.yaml)</summary>
+                <ul class="props-list"><li>Error.code</li><li>Error.message</li><li>Error.details[].field</li></ul>
+            </details>
+            <table data-mode="validation">
+                <tr><th class="checkbox-cell"></th><th>Test Scenario</th><th>Verification / Note</th><th>Source</th></tr>
+                <tr data-id="6" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">quantity = 1 (min)</td><td class="col-verify"><span class="arrow">⬅️</span> 201</td><td class="col-source">openapi OrderItem.quantity minimum: 1</td></tr>
+                <tr data-id="7" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">quantity = 100 (max)</td><td class="col-verify"><span class="arrow">⬅️</span> 201</td><td class="col-source">openapi OrderItem.quantity maximum: 100</td></tr>
+                <tr data-id="8" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">quantity = 0</td><td class="col-verify"><span class="arrow">⬅️</span> 400, code=VALIDATION_ERROR, details[].field=items[0].quantity</td><td class="col-source">openapi OrderItem.quantity</td></tr>
+                <tr data-id="9" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">quantity = 101</td><td class="col-verify"><span class="arrow">⬅️</span> 400, code=VALIDATION_ERROR</td><td class="col-source">openapi OrderItem.quantity</td></tr>
+                <tr data-id="10" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Empty items array</td><td class="col-verify"><span class="arrow">⬅️</span> 400, code=VALIDATION_ERROR</td><td class="col-source">openapi CreateOrder.items minItems: 1</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="section" data-section="auth">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="mode-header">
+                <h2>Auth &amp; Permissions</h2>
+                <span class="mode-badge purple">3</span>
+            </div>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <table data-mode="auth">
+                <tr><th class="checkbox-cell"></th><th>Test Scenario</th><th>Verification / Note</th><th>Source</th></tr>
+                <tr data-id="11" data-tags="api smoke regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">No bearer token</td><td class="col-verify"><span class="arrow">⬅️</span> 401</td><td class="col-source">openapi securitySchemes</td></tr>
+                <tr data-id="12" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Customer reads another customer's order</td><td class="col-verify"><span class="arrow">⬅️</span> 404 (not 403, so IDs don't leak)</td><td class="col-source">PRD §5.2</td></tr>
+                <tr data-id="13" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Customer calls the refund endpoint</td><td class="col-verify"><span class="arrow">⬅️</span> 403, only role=support may refund</td><td class="col-source">PRD §5.3</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="section" data-section="state">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="mode-header">
+                <h2>State Transitions</h2>
+                <span class="mode-badge yellow">4</span>
+            </div>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <table data-mode="state">
+                <tr><th class="checkbox-cell"></th><th>Test Scenario</th><th>Verification / Note</th><th>Source</th></tr>
+                <tr data-id="14" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Pay a CANCELLED order</td><td class="col-verify"><span class="arrow">⬅️</span> 409, code=INVALID_STATE, status unchanged</td><td class="col-source">PRD §2.3</td></tr>
+                <tr data-id="15" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Cancel a PAID order</td><td class="col-verify"><span class="arrow">⬅️</span> 409, code=INVALID_STATE, status unchanged</td><td class="col-source">PRD §2.4</td></tr>
+                <tr data-id="16" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Refund a PENDING order</td><td class="col-verify"><span class="arrow">⬅️</span> 409, code=INVALID_STATE</td><td class="col-source">PRD §2.5</td></tr>
+                <tr data-id="17" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Pay an order that is already PAID</td><td class="col-verify"><span class="info">💡</span> PRD is silent — see Q1</td><td class="col-source">PRD §2.3</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="section" data-section="rules">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="mode-header">
+                <h2>Business Rules &amp; Limits</h2>
+                <span class="mode-badge yellow">3</span>
+            </div>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <details class="props-dropdown">
+                <summary>Properties (openapi.yaml)</summary>
+                <ul class="props-list"><li>Refund.amount</li><li>Order.paidAt</li></ul>
+            </details>
+            <details class="props-dropdown">
+                <summary>Properties (docs)</summary>
+                <ul class="props-list"><li>Refund.reason</li></ul>
+                <p class="props-note">&#9888;&#65039; Not in spec — named in PRD §2.5 only. Confirm with engineer.</p>
+            </details>
+            <table data-mode="rules">
+                <tr><th class="checkbox-cell"></th><th>Test Scenario</th><th>Verification / Note</th><th>Source</th></tr>
+                <tr data-id="18" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Refund 30 days after payment</td><td class="col-verify"><span class="arrow">⬅️</span> 201 (window counted from paidAt — see Q2)</td><td class="col-source">PRD §3.1</td></tr>
+                <tr data-id="19" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Refund 31 days after payment</td><td class="col-verify"><span class="arrow">⬅️</span> 422, code=REFUND_WINDOW_EXPIRED</td><td class="col-source">PRD §3.1</td></tr>
+                <tr data-id="20" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Partial refunds that add up to more than the total</td><td class="col-verify"><span class="arrow">⬅️</span> 422, code=REFUND_EXCEEDS_TOTAL on the refund that crosses the total</td><td class="col-source">PRD §3.2</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="section" data-section="idempotency">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="mode-header">
+                <h2>Idempotency &amp; Concurrency</h2>
+                <span class="mode-badge blue">3</span>
+            </div>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <table data-mode="idempotency">
+                <tr><th class="checkbox-cell"></th><th>Test Scenario</th><th>Verification / Note</th><th>Source</th></tr>
+                <tr data-id="21" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Repeat pay with the same Idempotency-Key</td><td class="col-verify"><span class="arrow">⬅️</span> same response both times, customer charged once</td><td class="col-source">PRD §4.1; openapi header Idempotency-Key</td></tr>
+                <tr data-id="22" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Same Idempotency-Key with a different body</td><td class="col-verify"><span class="arrow">⬅️</span> 422, code=IDEMPOTENCY_KEY_REUSED</td><td class="col-source">openapi POST /orders/{id}/pay responses</td></tr>
+                <tr data-id="23" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Pay and cancel the same PENDING order at the same time</td><td class="col-verify"><span class="arrow">⬅️</span> one succeeds, the other gets 409; final state matches the winner</td><td class="col-source">PRD §4.2</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="section" data-section="pagination">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="mode-header">
+                <h2>Pagination &amp; Filtering</h2>
+                <span class="mode-badge green">3</span>
+            </div>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <details class="props-dropdown">
+                <summary>Properties (openapi.yaml)</summary>
+                <ul class="props-list"><li>OrderList.items</li><li>OrderList.nextCursor</li></ul>
+            </details>
+            <table data-mode="pagination">
+                <tr><th class="checkbox-cell"></th><th>Test Scenario</th><th>Verification / Note</th><th>Source</th></tr>
+                <tr data-id="24" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">GET /orders?limit=100 (max)</td><td class="col-verify"><span class="arrow">⬅️</span> 200, at most 100 items, nextCursor set when more exist</td><td class="col-source">openapi GET /orders limit maximum: 100</td></tr>
+                <tr data-id="25" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">GET /orders?limit=101</td><td class="col-verify"><span class="arrow">⬅️</span> 400, code=VALIDATION_ERROR</td><td class="col-source">openapi GET /orders limit</td></tr>
+                <tr data-id="26" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">GET /orders?status=PAID</td><td class="col-verify"><span class="arrow">⬅️</span> only PAID orders returned</td><td class="col-source">openapi GET /orders status</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="section" data-section="errors">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="mode-header">
+                <h2>Error Handling</h2>
+                <span class="mode-badge red">2</span>
+            </div>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <table data-mode="errors">
+                <tr><th class="checkbox-cell"></th><th>Test Scenario</th><th>Verification / Note</th><th>Source</th></tr>
+                <tr data-id="27" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Unknown order id</td><td class="col-verify"><span class="arrow">⬅️</span> 404, body matches Error schema (code, message)</td><td class="col-source">openapi components.schemas.Error</td></tr>
+                <tr data-id="28" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Malformed JSON body</td><td class="col-verify"><span class="arrow">⬅️</span> 400, body matches Error schema, no stack trace in message</td><td class="col-source">openapi components.schemas.Error</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="section" data-section="persistence">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="mode-header">
+                <h2>Persistence &amp; Recovery</h2>
+                <span class="mode-badge purple">2</span>
+            </div>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <table data-mode="persistence">
+                <tr><th class="checkbox-cell"></th><th>Test Scenario</th><th>Verification / Note</th><th>Source</th></tr>
+                <tr data-id="29" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Payment provider times out during pay</td><td class="col-verify"><span class="arrow">⬅️</span> order stays PENDING; retry with the same key succeeds once</td><td class="col-source">PRD §4.3</td></tr>
+                <tr data-id="30" data-tags="api regression"><td class="checkbox-cell"><input type="checkbox" onchange="onCheck(this)"></td><td class="col-scenario">Read order after a service restart</td><td class="col-verify"><span class="arrow">⬅️</span> status, items and total unchanged</td><td class="col-source">PRD §4.3</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Questions -->
+    <div class="section" data-section="questions">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="mode-header">
+                <h2>Questions for Clarification</h2>
+                <span class="mode-badge purple">2</span>
+            </div>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <table>
+                <tr><th style="width:30px">#</th><th>Question</th><th>Options</th></tr>
+                <tr class="question-row"><td>1</td><td>Paying an order that is already PAID — return the existing payment or reject? (PRD §2.3 covers PENDING and CANCELLED only.)</td><td>(A) 200, same body | (B) 409 INVALID_STATE | (C) Other</td></tr>
+                <tr class="question-row"><td>2</td><td>Does the 30-day refund window start at payment or at delivery? (PRD §3.1 gives no start point.)</td><td>(A) paidAt | (B) delivery date | (C) createdAt</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Not Covered -->
+    <div class="section" data-section="notcovered">
+        <div class="section-header" onclick="toggleSection(this)">
+            <h2>Not Covered</h2>
+            <span class="toggle">&#9660;</span>
+        </div>
+        <div class="section-content">
+            <table>
+                <tr><th>Item</th><th>Reason</th></tr>
+                <tr><td>PRD §6 Analytics events</td><td class="col-verify"><span class="info">💡</span> Not testable through the API — skipped</td></tr>
+                <tr><td>Rate limits (standard check)</td><td class="col-verify"><span class="info">💡</span> Docs and spec define no rate limits — skipped</td></tr>
+                <tr><td>Backwards compatibility (standard check)</td><td class="col-verify"><span class="info">💡</span> New API, no earlier version — skipped</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'api-test-plan-orders-api-example';
+        const TOTAL = 30;
+
+        function loadState() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; } }
+        function saveState(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+
+        function getKey(cb) {
+            const tr = cb.closest('tr');
+            return tr.dataset.id || `${cb.closest('table').dataset.mode}-${Array.from(cb.closest('table').querySelectorAll('tr')).indexOf(tr)}`;
+        }
+
+        function onCheck(cb) {
+            const state = loadState();
+            const key = getKey(cb);
+            const tr = cb.closest('tr');
+            if (cb.checked) { state[key] = true; tr.classList.add('checked'); }
+            else { delete state[key]; tr.classList.remove('checked'); }
+            saveState(state);
+            updateProgress();
+        }
+
+        function initCheckboxes() {
+            const state = loadState();
+            document.querySelectorAll('tr[data-id]').forEach(tr => {
+                const key = tr.dataset.id;
+                const cb = tr.querySelector('input[type="checkbox"]');
+                if (state[key]) { cb.checked = true; tr.classList.add('checked'); }
+            });
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const state = loadState();
+            const c = Object.keys(state).length;
+            document.getElementById('reviewedCount').textContent = c;
+            document.getElementById('progressFill').style.width = (c / TOTAL * 100) + '%';
+            document.getElementById('progressText').textContent = `${c} / ${TOTAL} reviewed`;
+            const badge = document.getElementById('statusBadge');
+            if (c === TOTAL) { badge.textContent = 'REVIEWED'; badge.classList.add('approved'); }
+            else { badge.textContent = 'PENDING REVIEW'; badge.classList.remove('approved'); }
+        }
+
+        function toggleSection(header) { header.parentElement.classList.toggle('collapsed'); }
+        function expandAll() { document.querySelectorAll('.section').forEach(s => s.classList.remove('collapsed')); }
+        function collapseAll() { document.querySelectorAll('.section').forEach(s => s.classList.add('collapsed')); }
+
+        // Search
+        const searchInput = document.getElementById('searchInput');
+        const searchCount = document.getElementById('searchCount');
+        searchInput.addEventListener('input', () => {
+            const q = searchInput.value.toLowerCase();
+            let matches = 0;
+            document.querySelectorAll('tr[data-id]').forEach(tr => {
+                const show = !q || tr.textContent.toLowerCase().includes(q);
+                tr.classList.toggle('search-hidden', !show);
+                if (show && q) matches++;
+            });
+            searchCount.textContent = q ? `${matches} match${matches !== 1 ? 'es' : ''}` : '';
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.key === '/' && document.activeElement !== searchInput) { e.preventDefault(); searchInput.focus(); }
+            if (e.key === 'Escape') { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); searchInput.blur(); }
+        });
+
+        // Filters
+        document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const f = btn.dataset.filter;
+                if (f === 'expand') { expandAll(); return; }
+                if (f === 'collapse') { collapseAll(); return; }
+                document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const state = loadState();
+                document.querySelectorAll('tr[data-id]').forEach(tr => {
+                    const tags = tr.dataset.tags || '';
+                    let show = true;
+                    if (f.startsWith('tag-')) show = tags.split(' ').includes(f.slice(4));
+                    else if (f === 'unchecked') show = !state[tr.dataset.id];
+                    tr.classList.toggle('search-hidden', !show);
+                });
+            });
+        });
+
+        function exportJSON() {
+            const state = loadState();
+            const data = { plan: 'orders-api-example', date: new Date().toISOString(), total: TOTAL, reviewed: Object.keys(state).length, checkedTests: state };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'api-test-plan-results.json'; a.click();
+        }
+
+        // Theme toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme') || 'light';
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            document.getElementById('themeToggle').textContent = next === 'dark' ? '🌙' : '☀️';
+        }
+        (function initTheme() {
+            const saved = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', saved);
+            document.getElementById('themeToggle').textContent = saved === 'dark' ? '🌙' : '☀️';
+        })();
+
+        initCheckboxes();
+    </script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+ID,Title,Type,Priority,Category,Objective,Preconditions,Steps,Expected Result,Tags,Source
+TC-001,Add item to cart,Positive,normal,Cart,Verify an item can be added to the cart.,Signed-in user with an empty cart. Product Desk Lamp costs 25.00.,"1. Open the Desk Lamp product page.
+2. Select Add to cart.",Cart shows 1 x Desk Lamp. Subtotal is 25.00.,"web, cart",R-01 [checkout-prd.md § Cart]
+TC-002,Quantity 0 rejected,Negative,normal,Cart,Verify a quantity of 0 is rejected.,Cart has 1 x Desk Lamp.,"1. Change the quantity to 0.
+2. Select Update.","Message ""Quantity must be between 1 and 10"" is shown. Quantity stays 1.","web, cart",R-01 [checkout-prd.md § Cart]
+TC-003,Quantity 11 rejected by API,Edge,normal,Cart,Verify the API rejects a quantity above the maximum of 10.,Cart has 1 x Desk Lamp.,1. Send PATCH /v1/cart/items/{id} with quantity 11.,400 response with error QUANTITY_OUT_OF_RANGE. Quantity stays 1.,"api, cart",R-01 [checkout-prd.md § Cart]
+TC-004,Valid code reduces total,Positive,critical,Discount Codes,Verify a valid percentage code reduces the order total.,"Cart subtotal is 80.00. Code SAVE10 (10% off, minimum order 50.00) is active.","1. Enter SAVE10 in the discount field.
+2. Select Apply.",Discount line shows -8.00. Order total is 72.00.,"web, checkout",R-05 [checkout-prd.md § Discount codes]
+TC-005,Second code rejected,Negative,critical,Discount Codes,Verify only one discount code can be used per order.,Cart subtotal is 80.00 with SAVE10 applied.,"1. Enter WELCOME5 in the discount field.
+2. Select Apply.","Message ""Only one discount code can be used per order"" is shown. SAVE10 stays applied. Order total stays 72.00.","web, checkout",R-05 [checkout-prd.md § Discount codes]
+TC-006,Code at minimum order value,Edge,critical,Discount Codes,Verify a code is accepted when the subtotal equals the minimum order value.,Cart subtotal is exactly 50.00. Code SAVE10 has a minimum order of 50.00.,"1. Enter SAVE10 in the discount field.
+2. Select Apply.",Code is applied. Order total is 45.00.,"web, checkout",R-05 [checkout-prd.md § Discount codes]
+TC-007,Declined card keeps cart,Negative,high,Payment,Verify a declined card shows an error and keeps the cart.,User is on the payment step. Order total is 72.00 with SAVE10 applied.,"1. Enter the test card that is always declined.
+2. Select Pay.","Message ""Your card was declined"" is shown. User stays on the payment step. Cart and SAVE10 are kept. No order is created.","web, payment",R-09 [checkout-prd.md § Payment]
+TC-008,Double submit charges once,Edge,critical,Payment,Verify a double submit creates one order and one charge.,User is on the payment step with valid card details entered.,1. Select Pay twice within one second.,One order is created. The card is charged once.,"web, api, payment",R-09 [checkout-prd.md § Payment]
+TC-009,Paid order is locked,Negative,high,Order Confirmation,Verify a paid order can't be edited.,Order status is PAID.,1. Send PATCH /v1/orders/{id} to change an item quantity.,409 response with error ORDER_LOCKED. Order is unchanged.,"api, checkout",S-02 [checkout-prd.md § Order states]
