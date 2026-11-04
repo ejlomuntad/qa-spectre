@@ -1,0 +1,119 @@
+# Standard checks for API test plans.
+# Agent B walks this list for every feature. A check is a prompt to look,
+# not a requirement: write tests only where the docs or spec define the
+# behaviour. Docs silent but it matters -> clarification question.
+# Otherwise -> NOT COVERED section with the reason.
+
+version: 1
+
+# Shape of one test plan row (one TSV row in the markdown).
+entry:
+  status: Empty. The tester marks pass/fail.
+  scenario: Short title of what is done. No banned terms from project rules.
+  verification: "Starts with ⬅️ (assertion: status code, fields, values) or 💡 (note, open point, 'see Q<n>')."
+  source: "Inventory ID and document, e.g. 'R-04 [orders-prd.docx § Refunds]', 'E-01 [openapi.yaml POST /orders]', or 'project rules'. Required."
+  tags: Space separated. From project rules "Test case tags"; default api / smoke / regression.
+
+# Where response properties may come from, in priority order.
+property_sources:
+  - spec: Fields defined in the OpenAPI or JSON schema. Mark "Properties (<spec file>):".
+  - docs: 'Fields named only in the documents. Mark "Properties (docs):" and, if a spec exists, add "⚠️ Not in spec — named in <doc ref> only. Confirm with engineer."'
+  - no_spec: 'No spec at all: add once at the top of the plan "⚠️ No API spec — field names come from the docs. Confirm with engineer."'
+  - none: Never list a field that neither the docs nor the spec name.
+
+areas:
+  - id: happy-path
+    title: Happy paths
+    applies_when: always
+    checks:
+      - Each endpoint with valid input returns the documented success code and body.
+      - Each main user flow end to end, in the documented order.
+      - Response fields match the spec types and formats.
+
+  - id: validation
+    title: Input validation and boundaries
+    applies_when: the docs or spec define fields, types, formats or limits
+    checks:
+      - Each documented min and max, plus min-1 and max+1.
+      - Missing required field, empty string, empty array, null.
+      - Wrong type, wrong format (date, email, ID, enum value not in the list).
+      - Unknown extra fields (rejected or ignored, as documented).
+      - Units from project rules (e.g. cents vs dollars, time zones).
+
+  - id: auth
+    title: Auth and permissions
+    applies_when: the docs or spec define authentication, roles, scopes or ownership
+    checks:
+      - No credentials, expired or invalid credentials.
+      - Valid user with the wrong role or scope.
+      - Access to another user's or tenant's resource.
+
+  - id: state
+    title: State transitions
+    applies_when: an entity has documented states
+    checks:
+      - Every allowed transition.
+      - Every transition the docs disallow or imply is invalid; state stays unchanged.
+      - Repeating an action on a resource already in the target state.
+
+  - id: business-rules
+    title: Business rules and limits
+    applies_when: the docs define rules, caps, quotas or time windows
+    checks:
+      - At the limit, just inside and just outside.
+      - Cumulative limits (totals across several requests).
+      - Rules that combine (two rules apply to the same request).
+
+  - id: errors
+    title: Error handling and error format
+    applies_when: always
+    checks:
+      - Each documented error code and status.
+      - Error body matches the documented format.
+      - Not found, malformed body, unsupported method or media type.
+      - No internal details (stack traces, SQL) in error messages.
+
+  - id: idempotency
+    title: Idempotency and retries
+    applies_when: the docs mention idempotency keys, retries or "at most once" behaviour
+    checks:
+      - Same request repeated with the same key gives the same result, applied once.
+      - Same key with a different body.
+      - Retry after a timeout.
+
+  - id: concurrency
+    title: Concurrency
+    applies_when: two requests can change the same resource
+    checks:
+      - Two conflicting requests at the same time; one wins, the final state is consistent.
+      - Optimistic locking or version fields, if documented.
+
+  - id: pagination
+    title: Pagination, filtering and sorting
+    applies_when: a list endpoint exists
+    checks:
+      - First page, last page, empty result.
+      - Page size default, max and max+1.
+      - Each filter and sort option, and invalid values.
+
+  - id: persistence
+    title: Persistence and recovery
+    applies_when: the docs describe stored data or downstream calls
+    checks:
+      - Data read back after write matches what was sent.
+      - Data survives a service restart.
+      - Downstream failure or timeout leaves no partial state.
+
+  - id: rate-limits
+    title: Rate limits
+    applies_when: the docs or spec define rate limits or quotas
+    checks:
+      - Requests at the limit succeed; the next one is rejected with the documented code.
+      - Documented rate limit headers are present.
+
+  - id: compatibility
+    title: Backwards compatibility
+    applies_when: the docs describe a change to an existing API
+    checks:
+      - Existing clients' requests still work.
+      - Removed or renamed fields follow the documented deprecation.
