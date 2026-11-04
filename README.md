@@ -64,7 +64,7 @@ Commands that start with `/` (like `/plugin`) are typed **inside** Claude Code, 
 Type these inside Claude Code, one at a time:
 
 ```
-/plugin marketplace add vgwellen/qa-spectre
+/plugin marketplace add ejlomuntad/qa-spectre
 /plugin install testkit@qa-spectre
 /plugin install skill-scan@qa-spectre
 ```
