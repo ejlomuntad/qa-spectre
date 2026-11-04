@@ -147,3 +147,7 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# skill-scan CI output
+skill-scan-out/
+skill-scan-in/
