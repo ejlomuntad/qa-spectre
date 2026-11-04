@@ -1,0 +1,34 @@
+# Runs skill-scan on every PR to main. Copy to .github/workflows/skill-scan.yml in your repo
+# (or run /skill-scan:skill-scan setup-ci). Then:
+#   1. Make "skill-scan / gate" a required status check on main (Settings > Branches).
+#   2. Before merging a PR, run /skill-scan:skill-scan changed in Claude Code on your machine
+#      (the deep scan, with your own Claude login). No secret is needed on GitHub.
+#   Optional: to run the deep scan here too, set deep_scan: ci and add an ANTHROPIC_API_KEY secret.
+# Replace both <commit-sha> below with the same full commit SHA of vgwellen/qa-spectre
+# (gh api repos/vgwellen/qa-spectre/commits/main --jq .sha). setup-ci does this for you.
+# A SHA can't change under you; a branch like main can.
+
+name: skill-scan
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: skill-scan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  skill-scan:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: vgwellen/qa-spectre/.github/workflows/skill-scan.yml@<commit-sha>
+    with:
+      scanner_ref: <commit-sha>
+      deep_scan: local          # or: ci (then uncomment the secret below)
+    # secrets:
+    #   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
