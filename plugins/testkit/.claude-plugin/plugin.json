@@ -1,7 +1,7 @@
 {
   "name": "testkit",
   "description": "QA skills for any software project: API test plans and test cases from requirements and specs, and feature-by-feature API audits with bug tickets and pass notes",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "Ellen Jane Lomuntad"
   }
