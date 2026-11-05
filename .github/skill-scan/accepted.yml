@@ -1,0 +1,24 @@
+# Accepted skill-scan findings. Every change to this file shows in the PR diff: review it like code.
+#
+# Each entry clears matching findings from the pre-merge gate:
+#   id:          pattern ID (e.g. P2.10) or the Claude finding's rule (e.g. C3), or "*" for any rule
+#   file:        repo-relative path; end it with / to cover a whole folder
+#   match:       text that appears on the line (use this, not line numbers: they shift)
+#   match_regex: instead of match, a regular expression for the line
+#   reason:      why it's fine. CI `block` patterns and Critical findings need a reason
+#                that starts with "false-positive:", otherwise the entry is ignored.
+
+- id: "*"
+  file: plugins/skill-scan/skills/skill-scan/references/patterns.md
+  match_regex: '^\| P\d\.\d+ \|'
+  reason: "false-positive: the scanner's own rule table lists the attack patterns it looks for"
+
+- id: P2.9
+  file: plugins/skill-scan/skills/skill-scan/scripts/scan-patterns.pl
+  match: 's/(?<![A-Za-z0-9])(sk-ant-|'
+  reason: "false-positive: the regex that masks secrets in scan output"
+
+- id: P2.9
+  file: plugins/skill-scan/skills/skill-scan/scripts/gate.py
+  match: 'SECRET_RE = re.compile(r"(?<![A-Za-z0-9])(sk-ant-|'
+  reason: "false-positive: the regex that masks secrets in the PR comment"

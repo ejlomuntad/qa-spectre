@@ -4,8 +4,8 @@
 #   2. Before merging a PR, run /skill-scan:skill-scan changed in Claude Code on your machine
 #      (the deep scan, with your own Claude login). No secret is needed on GitHub.
 #   Optional: to run the deep scan here too, set deep_scan: ci and add an ANTHROPIC_API_KEY secret.
-# Replace both <commit-sha> below with the same full commit SHA of vgwellen/qa-spectre
-# (gh api repos/vgwellen/qa-spectre/commits/main --jq .sha). setup-ci does this for you.
+# Replace both <commit-sha> below with the same full commit SHA of ejlomuntad/qa-spectre
+# (gh api repos/ejlomuntad/qa-spectre/commits/main --jq .sha). setup-ci does this for you.
 # A SHA can't change under you; a branch like main can.
 
 name: skill-scan

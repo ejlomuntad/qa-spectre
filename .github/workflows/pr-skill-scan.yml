@@ -1,0 +1,27 @@
+# This repo's own pre-merge check: the free pattern check and gate on every PR, no secret.
+# It calls the same reusable workflow other repos use, with the scanner, skill and gate taken from the base branch. The reusable workflow file itself comes from
+# the PR, so review every change under .github/ before merging.
+
+name: pr-skill-scan
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: skill-scan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  skill-scan:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/skill-scan.yml
+    with:
+      scanner_repo: ${{ github.repository }}
+      scanner_ref: ${{ github.base_ref }}
+      deep_scan: local   # free check only; run /skill-scan:skill-scan changed locally before merging
