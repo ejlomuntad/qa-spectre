@@ -1,6 +1,6 @@
 ---
 name: skill-scan
-description: Security scan of AI agent skills, plugins and MCP configs before you install or share them, with nothing to install. Reads a skill folder, a SKILL.md, a plugin, a .mcp.json or a GitHub repo, runs pattern checks and a full read-through for prompt injection, data exfiltration, dangerous commands, persistence, supply-chain risk, excessive agency and obfuscation, then gives a 0–100 risk score, a verdict and an MD report. Read only: it never runs, installs or edits the scanned code. Use for "scan this skill", "is this skill safe", "check <skill> for security issues", "scan all my skills", "skill-scan <path or repo>".
+description: 'Security scan of AI agent skills, plugins and MCP configs before you install or share them, with nothing to install. Reads a skill folder, a SKILL.md, a plugin, a .mcp.json or a GitHub repo, runs pattern checks and a full read-through for prompt injection, data exfiltration, dangerous commands, persistence, supply-chain risk, excessive agency and obfuscation, then gives a 0–100 risk score, a verdict and an MD report. Read only: it never runs, installs or edits the scanned code. Use for "scan this skill", "is this skill safe", "check <skill> for security issues", "scan all my skills", "skill-scan <path or repo>".'
 argument-hint: <skill folder | SKILL.md | plugin folder | .mcp.json | GitHub repo URL | skill name | "all" | "repo" | "changed[=<base>]" | "setup-ci"> [ci] [--out <dir>]
 allowed-tools: Read, Grep, Glob, Agent, AskUserQuestion, Bash(ls:*)
 ---
