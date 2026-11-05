@@ -1,77 +1,63 @@
-# Passnote mode (fix verification)
+# Ticket mode (API bug ticket)
 
-After the engineer's fix PR is merged, re-verify the ticket(s) through the API and write a copy-paste PASS or FAIL comment for your issue tracker with fresh evidence. Use the project rules' issue-tracker format if given.
+Re-verifies one bug, saves JSON evidence and writes a copy-paste bug ticket for the engineers. Follow the project rules' issue-tracker format (tracker, project key, ID format, required fields) if given; otherwise use the format below. When the source of truth isn't explicit, reason from what it does say (related rules, the API spec, how the same case behaves in another endpoint or feature) and write the expected section as "please confirm".
 
-## Step 0: Get the PR (required)
+## Step 1: Locate inputs
 
-If the request has no PR number or URL, **ask and stop until the user answers**:
+| Input | Usual location |
+|---|---|
+| Source of truth | the shared requirements inventory (SKILL.md, Requirements) and the API spec; cite the rule by inventory ID and document section |
+| Source code | the project rules' source folder, otherwise `src/` or similar (only to understand the bug; never quoted in the ticket) |
+| API tests | the project rules' API tests folder, otherwise search (see `references/audit.md`, Step 1) |
+| Latest main | the separate checkout of upstream main, `<work>/main/` (SKILL.md, Paths), updated and built |
 
-> Please provide the engineer's PR for this fix (number or URL), and the ticket ID(s) if the PR covers more than one bug.
+Test **upstream main**, not a stale branch, so the bug isn't already fixed. Check the ledger first: if this bug already has a ticket line, update it rather than writing a duplicate.
 
-## Step 1: Read the PR
+## Step 2: Double-check that it really is a bug
 
-```bash
-gh pr view <PR> --json number,title,body,state,mergedAt,baseRefName,headRefName,commits,files
+Don't write a ticket until all three agree:
+1. **Source of truth:** the exact document and section, or the rule text. If documents disagree (e.g. requirements vs API spec), say which one you followed and why.
+2. **Code:** it does what the API shows (for your understanding only).
+3. **API:** reproduced with real requests on the project's test servers (restarted first if they're local; SKILL.md, Test servers and test runs).
+
+- Use test data that gives a clean, known state; start chains with setup requests that create or reset the data.
+- Add a **control case** when it helps (the same request with one input changed, or a valid request next to the invalid one).
+- Check the same case on related endpoints or roles. An inconsistency between them is strong evidence.
+- If the evidence says it's NOT a bug, stop and tell the user why. Don't write the ticket.
+
+## Step 3: Save the evidence
+
+Write a small script under `<work>` that runs the repro against the same servers as the collection, after the host check (SKILL.md, Test servers and test runs). It saves every request/response to the bug evidence folder in the **evidence format** below. Leave out tokens and secrets.
+
+**Evidence format** (ticket and pass-note evidence use the same one, so before and after files compare directly): one file per step, `NN-<label>.json`, numbered `01`, `02` …, with
+```json
+{ "step": "refund-more-than-paid", "endpoint": "POST /orders/{id}/refunds", "request": { "body": {} }, "response": { "status": 201, "body": {} } }
 ```
+Labels describe the step (e.g. `03-refund-more-than-paid-accepted.json`).
 
-- Confirm it's **merged** into main. If not, tell the user and ask whether to test the PR branch instead.
-- Map each ticket ID to its bug from the PR title, body and commits. If a mapping is a guess, say so.
-- Find the original repro and expected values: the ledger's ticket line, its bug evidence folder, memory, or ask the user.
+## Step 4: Write the ticket
 
-## Step 2: Build the fixed version
+Start with: `Written for: the <project> engineering team, as a bug ticket you copy and paste into <tracker>.`
 
-- Update the separate checkout of upstream main, `<work>/main/` (SKILL.md, Paths), to a commit that includes the PR, then build.
-- Read the version from that commit (e.g. `package.json`, the spec's `info.version`), or use the short commit hash.
-- Check the hosts and, for local servers, restart them (SKILL.md, Test servers and test runs).
+- **Title:** one line describing the wrong behaviour.
+- **Type:** Bug
+- **Component:** `<project> API (<feature>)`
+- **Priority:** High if it corrupts data, affects money, breaks security or blocks a main flow; Medium for wrong behaviour with small impact; Low for cosmetic response fields.
+- **Description:** what happens in plain words, and where (endpoint, role, state).
+- **Steps to reproduce** (environment, user/role, server, and the API test tool used, e.g. "Bruno 1.20"): numbered. Give the method, endpoint and key body fields, and the key response fields after each important step.
+- **Expected (source of truth):** quote the document and section or rule (and its inventory ID, e.g. `R-04`), then a table of expected values. Add "please confirm" (and "if this is intended, please point us to the rule") when the source of truth isn't explicit.
+- **Actual (API):** a table of actual values per case, wrong values in bold. Include the stored data or balance change when data or money is affected.
+- **Impact:** who is affected, how often, the effect on data, money or security, which endpoints.
+- **Evidence:** the folder path, a `Files | Content` table, and "Attach at least …" with the key files.
 
-## Step 3: Re-verify through the API
+Add any required fields from the project rules.
 
-- Re-run the original repro (and any control case) on every endpoint, role and state the ticket mentions.
-- Run the **whole** API test suite the way the project does, and read the report with `read_results.py` (SKILL.md, Test servers and test runs).
-  - The bug's intentional failures should now pass.
-  - If tests asserted the old (buggy) behaviour, propose the updates and wait for the go-ahead. Then back up, update, format and rerun.
-- Count the relevant checks for the notes (e.g. "all 48 refund checks pass").
-- If the fix doesn't work, or works only partly, **don't write PASS.** Write the same comment with `API test result: FAIL` and expected vs actual values, and offer to update the bug ticket.
-- Note any new side effect of the fix (e.g. a new error code or a changed response field) and ask whether it's accepted before calling it PASS.
+## Step 5: Ledger
 
-## Step 4: Save fresh evidence
+If the ledger exists, add or update the ticket line (`references/ledger.md`): `ID pending`, status `open — not filed yet`. When the user says it's filed, set `open` and fill in the ticket ID. If there's no ledger, skip this; don't create one.
 
-Save the requests and responses from the fixed build to the fix evidence folder, one folder per ticket, in the same **evidence format** as the bug ticket (`references/ticket.md`, Step 3): `NN-<label>.json` with `step`, `endpoint`, `request` and `response`. Use the same step numbers as the bug evidence where you re-run the same step, so before and after line up. Leave out tokens and secrets. Labels show what the file proves (e.g. `03-refund-more-than-paid-rejected-422.json`).
+## Step 6: Intentional-failure test (only with the go-ahead)
 
-## Step 5: Write the comment(s)
-
-Start with: `Written for: the ticket(s) <IDs>, as copy-paste PASS comments.` When the PR covers several tickets, write one comment each under `### <TICKET-ID>: <bug title>`.
-
-```
-**Build:**
-<project> <version> (main; includes PR #<n>)
-
-**API test result:** PASS
-
-**Pass Notes:**
-- What the API does now, compared with before ("now X. It used to Y.").
-- Where it was checked (each endpoint, role and state involved).
-- A table of the key steps: the response fields that prove the fix (status code, error code, the changed fields, stored data …), fixed value in bold.
-- Why the values are right, using the source of truth (document + section or rule).
-- Full API test suite (<tool and its version, e.g. "Postman / newman 6.2.3">, suite version <version>, <N> tests): all <n> <relevant> checks pass.
-
-**(Attached evidence)**
-Folder `<folder-name>`:
-- `01-<file>.json`
-- ...
-```
-
-Then tell the user briefly:
-- which mappings were guesses
-- where the evidence folders are
-- anything left over (old evidence folders, tests still to update, side effects to accept)
-
-## Step 6: Ledger
-
-If the ledger exists, update each ticket's line (`references/ledger.md`):
-- **PASS:** `fixed — PR #<n>, version <version>, verified <date> | fix evidence <folder>`. Remove its Intentional failures. If old-behaviour tests were updated, say so in one line.
-- **FAIL:** `still open — retest FAILED <date> (PR #<n>, version <version>)` plus what's still wrong. Keep its intentional failures.
-- **Accepted side effect:** add it to Decisions with the date.
-- Ticket not in the ledger yet: add its line with the new status.
-
-If there's no ledger, skip this; don't create one.
+- Offer a test (in the project's API test tool) that asserts the **correct** (source of truth) value, so it fails until the fix lands. Say where it goes (folder, request names, expected values) and wait.
+- Back up first, follow the rules in `references/audit.md`, Follow-up work (the project's own framework and style), then rerun the **whole** test suite (restarting local servers first) and list the intentional failures.
+- Add the test to the ledger's Intentional failures with the same ticket ID/title.
