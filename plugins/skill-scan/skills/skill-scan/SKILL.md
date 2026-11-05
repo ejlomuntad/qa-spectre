@@ -109,7 +109,7 @@ End with one line:
 Adds the pre-merge check to the user's current repo. It writes files, so **show what you'll write and ask before writing**.
 
 1. Check this is a git repo with a GitHub remote. If not, stop and say so.
-2. Write `.github/workflows/skill-scan.yml` from `templates/caller-workflow.yml`. Pin it: get the current commit with `gh api repos/vgwellen/qa-spectre/commits/main --jq .sha` and put that SHA in place of both `<commit-sha>` placeholders. If the file exists, show the difference and ask before replacing it.
+2. Write `.github/workflows/skill-scan.yml` from `templates/caller-workflow.yml`. Pin it: get the current commit with `gh api repos/ejlomuntad/qa-spectre/commits/main --jq .sha` and put that SHA in place of both `<commit-sha>` placeholders. If the file exists, show the difference and ask before replacing it.
 3. If `.github/skill-scan/accepted.yml` doesn't exist, create it from `templates/accepted.example.yml` (only comments, no entries).
 4. Don't commit or push. Tell the user the next steps:
    - after the first PR run, make `skill-scan / gate` a required status check on `main` (Settings → Branches), with code-owner review;
