@@ -1,0 +1,3 @@
+# Changes to the scan, its gate and its accepted findings need the owner's review.
+/.github/ @ejlomuntad
+/plugins/skill-scan/ @ejlomuntad

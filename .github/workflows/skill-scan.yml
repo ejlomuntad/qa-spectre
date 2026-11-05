@@ -1,0 +1,304 @@
+# Reusable pre-merge security scan of every skill, plugin and MCP config a PR changes.
+# Call it from a pull_request workflow (see skill-scan's templates/caller-workflow.yml).
+#
+#   patterns   deterministic pattern pass (free, no secrets)
+#   deep-scan  only with deep_scan: ci. Claude follows skill-scan's SKILL.md in ci mode
+#              (ANTHROPIC_API_KEY, read-only token). Default deep_scan: local = no secret here;
+#              the maintainer runs /skill-scan:skill-scan changed on their own machine.
+#   gate       no LLM: combines both, applies the accepted-findings file, comments, passes or fails
+#
+# The scanner, skill and gate always come from scanner_repo@scanner_ref, never from the PR,
+# so a PR can't weaken its own check without editing the workflow itself.
+
+name: skill-scan
+
+on:
+  workflow_call:
+    inputs:
+      scanner_repo:
+        description: Repo that ships the skill-scan plugin
+        type: string
+        default: ejlomuntad/qa-spectre
+      scanner_ref:
+        description: Branch or tag of scanner_repo to use (pin a tag)
+        type: string
+        default: main
+      accepted_file:
+        description: Accepted-findings file in the calling repo
+        type: string
+        default: .github/skill-scan/accepted.yml
+      trusted_association:
+        description: >-
+          PR authors whose own changes to accepted_file and the trust list count
+          (GitHub author_association). Everyone else gets the base branch copies.
+        type: string
+        default: OWNER
+      deep_scan:
+        description: >-
+          Where the deep (Claude) scan runs. "local" (default): only the free pattern check
+          runs here, no secret needed; the maintainer runs /skill-scan:skill-scan changed on
+          their own machine. "ci": also run it here, with the ANTHROPIC_API_KEY secret.
+        type: string
+        default: local
+      model:
+        description: Model for the deep scan
+        type: string
+        default: claude-sonnet-5-5
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: false
+
+permissions: {}
+
+env:
+  SKILL_DIR: plugins/skill-scan/skills/skill-scan
+
+jobs:
+  patterns:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_targets: ${{ steps.targets.outputs.has_targets }}
+      ok: ${{ steps.done.outputs.ok }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ inputs.scanner_repo }}
+          ref: ${{ inputs.scanner_ref }}
+          path: _scanner
+          persist-credentials: false
+
+      - name: Locate scanner
+        env:
+          SCANNER_REPO: ${{ inputs.scanner_repo }}
+          SCANNER_REF: ${{ inputs.scanner_ref }}
+        run: |
+          # Always the scanner from scanner_ref, never the PR's own copy.
+          if [ -f "_scanner/$SKILL_DIR/scripts/scan-patterns.pl" ]; then echo "SK=_scanner/$SKILL_DIR" >> "$GITHUB_ENV"
+          else echo "::error::skill-scan not found in $SCANNER_REPO@$SCANNER_REF"; exit 1; fi
+
+      - name: Find changed skills
+        id: targets
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          mkdir -p out
+          perl "$SK/scripts/scan-patterns.pl" --list-changed "origin/$BASE" > out/targets.txt  # fails the job on error
+          echo "Targets:"; cat out/targets.txt
+          if [ -s out/targets.txt ]; then echo "has_targets=true" >> "$GITHUB_OUTPUT"; else echo "has_targets=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Pattern pass
+        run: |
+          : > out/patterns.jsonl
+          while IFS= read -r t; do perl "$SK/scripts/scan-patterns.pl" "$t" >> out/patterns.jsonl; done < out/targets.txt
+          echo "$(wc -l < out/patterns.jsonl) matches"
+
+      - name: Mark success
+        id: done
+        run: echo "ok=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: skill-scan-patterns
+          path: out/
+          retention-days: 14
+
+  deep-scan:
+    needs: patterns
+    if: needs.patterns.outputs.has_targets == 'true' && inputs.deep_scan == 'ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ inputs.scanner_repo }}
+          ref: ${{ inputs.scanner_ref }}
+          path: _scanner
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: skill-scan-patterns
+          path: skill-scan-in
+
+      - name: Check preconditions
+        id: pre
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          mkdir -p skill-scan-out
+          # This job holds the API key, so it only ever loads the scanner from scanner_ref,
+          # never the PR's own copy (a plugin's hooks would run outside --allowedTools).
+          if [ -f "_scanner/$SKILL_DIR/SKILL.md" ]; then echo "SK=_scanner/$SKILL_DIR" >> "$GITHUB_ENV"
+          else echo "::error::skill-scan not found at scanner_ref: deep scan not run"; echo "failed" > skill-scan-out/deep-status.txt; exit 0; fi
+          if [ "$IS_FORK" = "true" ]; then echo "skipped-fork" > skill-scan-out/deep-status.txt
+          elif [ "$HAS_KEY" != "true" ]; then echo "skipped-no-key" > skill-scan-out/deep-status.txt
+          else echo "run" > skill-scan-out/deep-status.txt; echo "run=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Use the base branch trust list unless the author is trusted
+        if: steps.pre.outputs.run == 'true'
+        env:
+          ASSOC: ${{ github.event.pull_request.author_association }}
+          TRUSTED: ${{ inputs.trusted_association }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          f=.claude/skill-scan/trusted.md
+          if ! printf '%s\n' $TRUSTED | grep -qx "$ASSOC"; then
+            rm -f "$f"
+            if git cat-file -e "origin/$BASE:$f" 2>/dev/null; then mkdir -p "$(dirname "$f")"; git show "origin/$BASE:$f" > "$f"; fi
+            echo "Trust list from $BASE (author is $ASSOC)"
+          fi
+
+      - name: Install Claude Code (pinned)
+        if: steps.pre.outputs.run == 'true'
+        run: npm install -g @anthropic-ai/claude-code@2.1.317
+
+      # This step holds the API key, so Claude gets no shell beyond ls and runs no repo scripts:
+      # the pattern matches come from the patterns job. Project settings, hooks and MCP servers
+      # from the scanned repo are not loaded.
+      - name: Run skill-scan (ci mode)
+        if: steps.pre.outputs.run == 'true'
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODEL: ${{ inputs.model }}
+        run: |
+          claude -p "Read $SK/SKILL.md and follow it exactly, with these arguments: ci --targets skill-scan-in/targets.txt --patterns skill-scan-in/patterns.jsonl --out skill-scan-out" \
+            --model "$MODEL" \
+            --plugin-dir "$(dirname "$(dirname "$SK")")" \
+            --max-turns 120 \
+            --setting-sources user \
+            --strict-mcp-config \
+            --allowedTools "Read,Glob,Grep,Agent,Write(./skill-scan-out/**),Edit(./skill-scan-out/**),Bash(ls:*)" \
+            --disallowedTools "WebFetch,WebSearch,Read(//proc/**),Read(//sys/**),Read(//etc/**)" \
+            --output-format json > skill-scan-out/claude-run.json
+
+      - name: Record result
+        if: steps.pre.outputs.run == 'true'
+        env:
+          KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if grep -rqF -- "$KEY" skill-scan-out; then
+            echo "::error::API key found in the scan output. Output discarded."
+            rm -rf skill-scan-out; mkdir -p skill-scan-out; echo "failed" > skill-scan-out/deep-status.txt; exit 0
+          fi
+          if [ -s skill-scan-out/result.json ] && jq -e '.findings | type == "array"' skill-scan-out/result.json > /dev/null; then
+            echo "ran" > skill-scan-out/deep-status.txt
+          else
+            echo "failed" > skill-scan-out/deep-status.txt
+          fi
+          cat skill-scan-out/deep-status.txt
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: skill-scan-deep
+          path: skill-scan-out/
+          retention-days: 14
+
+  gate:
+    needs: [patterns, deep-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ inputs.scanner_repo }}
+          ref: ${{ inputs.scanner_ref }}
+          path: _scanner
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
+        with:
+          name: skill-scan-patterns
+          path: patterns
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
+        with:
+          name: skill-scan-deep
+          path: deep
+
+      - name: Decide
+        id: gate
+        env:
+          ACCEPTED: ${{ inputs.accepted_file }}
+          DEEP_SCAN: ${{ inputs.deep_scan }}
+          PATTERNS_OK: ${{ needs.patterns.outputs.ok == 'true' }}
+          ASSOC: ${{ github.event.pull_request.author_association }}
+          TRUSTED: ${{ inputs.trusted_association }}
+          BASE: ${{ github.base_ref }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Always the gate from scanner_ref, never the PR's own copy.
+          if [ -f "_scanner/$SKILL_DIR/scripts/gate.py" ]; then GATE="_scanner/$SKILL_DIR/scripts/gate.py"
+          else echo "::error::gate not found at scanner_ref"; echo "code=1" >> "$GITHUB_OUTPUT"; exit 0; fi
+          # Lower-case to match the deep-scan job's case-insensitive `if:`; anything but local/ci fails
+          # the gate, so a typo can't silently turn it into a pattern-only check.
+          mode=$(printf '%s' "$DEEP_SCAN" | tr '[:upper:]' '[:lower:]')
+          case "$mode" in
+            local|ci) ;;
+            *) echo "::error::deep_scan must be \"local\" or \"ci\" (got \"$DEEP_SCAN\")"; echo "code=1" >> "$GITHUB_OUTPUT"; exit 0 ;;
+          esac
+          if [ ! -s patterns/targets.txt ]; then status=no-targets
+          elif [ "$mode" = "local" ]; then status=local
+          elif [ -s deep/deep-status.txt ]; then status=$(cat deep/deep-status.txt)
+          else status=failed; fi
+          [ "$status" = "run" ] && status=failed
+          # The PR's own accepted entries only count for trusted authors; everyone else gets the base branch copy.
+          if ! printf '%s\n' $TRUSTED | grep -qx "$ASSOC"; then
+            if git cat-file -e "origin/$BASE:$ACCEPTED" 2>/dev/null; then git show "origin/$BASE:$ACCEPTED" > base-accepted.yml; else : > base-accepted.yml; fi
+            ACCEPTED=base-accepted.yml
+            echo "Accepted findings from $BASE (author is $ASSOC)"
+          fi
+          if [ -s "$ACCEPTED" ]; then yq -o=json '. // []' "$ACCEPTED" > accepted.json; else echo '[]' > accepted.json; fi
+          set +e
+          python3 "$GATE" \
+            --patterns patterns/patterns.jsonl --result deep/result.json \
+            --deep-status "$status" --patterns-ok "$PATTERNS_OK" --accepted accepted.json --targets patterns/targets.txt \
+            --comment comment.md --run-url "$RUN_URL"
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+          cat comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or update the PR comment
+        continue-on-error: true  # fork PRs get a read-only token; the job summary still has the result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- skill-scan-gate -->"))) | .id' | head -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@comment.md > /dev/null
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@comment.md > /dev/null
+          fi
+
+      - name: Pass or fail
+        env:
+          CODE: ${{ steps.gate.outputs.code }}
+        run: exit "${CODE:-1}"
